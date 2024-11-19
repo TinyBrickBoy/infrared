@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	ir "github.com/haveachin/infrared/pkg/infrared"
 	"gopkg.in/yaml.v3"
@@ -34,14 +36,11 @@ func newYamlDecoder() decoder {
 	})
 }
 
-// FileProvider reads a config file and returns a populated infrared.Config struct.
+// FileProvider liest eine Config-Datei und gibt eine strukturierte `ir.Config`-Instanz zurück.
 type FileProvider struct {
-	ConfigPath string
-	// Must be a directory
-	ProxiesPath string
-	// Types of the file
-	// Defaults to YAML
-	Type FileType
+	ConfigPath  string
+	ProxiesPath string // Muss ein Verzeichnis sein
+	Type        FileType
 }
 
 func (p FileProvider) Config() (ir.Config, error) {
@@ -144,4 +143,67 @@ func readAndUnmashalServerConfig(dcr decoder, path string) (ir.ServerConfig, err
 	}
 
 	return cfg, nil
+}
+
+// AutoReloadConfig implementiert das automatische Nachladen der Konfiguration.
+type AutoReloadConfig struct {
+	FileProvider FileProvider
+	Ticker       *time.Ticker
+	StopChan     chan struct{}
+}
+
+// StartAutoReload startet den Reload-Mechanismus.
+func (arc *AutoReloadConfig) StartAutoReload(onConfigUpdate func(ir.Config)) {
+	go func() {
+		for {
+			select {
+			case <-arc.Ticker.C:
+				// Lade die Konfiguration neu
+				cfg, err := arc.FileProvider.Config()
+				if err != nil {
+					log.Printf("Fehler beim Laden der Konfiguration: %v\n", err)
+					continue
+				}
+				// Rufe die Update-Funktion auf
+				onConfigUpdate(cfg)
+
+			case <-arc.StopChan:
+				arc.Ticker.Stop()
+				log.Println("Automatischer Reload gestoppt")
+				return
+			}
+		}
+	}()
+}
+
+// StopAutoReload stoppt den Reload-Mechanismus.
+func (arc *AutoReloadConfig) StopAutoReload() {
+	close(arc.StopChan)
+}
+
+// Hauptprogramm mit Auto-Reload-Integration
+func main() {
+	// Initialisiere FileProvider
+	fileProvider := FileProvider{
+		ConfigPath:  "config.yaml",
+		ProxiesPath: "proxies/",
+		Type:        YAML,
+	}
+
+	// Initialisiere AutoReloadConfig
+	autoReload := AutoReloadConfig{
+		FileProvider: fileProvider,
+		Ticker:       time.NewTicker(10 * time.Second),
+		StopChan:     make(chan struct{}),
+	}
+
+	// Starte den Auto-Reload
+	autoReload.StartAutoReload(func(cfg ir.Config) {
+		log.Println("Neue Konfiguration geladen:", cfg)
+		// Weitere Logik hier hinzufügen, z. B. Aktualisierung der Anwendung
+	})
+
+	// Simuliere einen Stop nach 1 Minute (optional)
+	time.Sleep(1 * time.Minute)
+	autoReload.StopAutoReload()
 }

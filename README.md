@@ -32,7 +32,6 @@ Infrared works as a reverse proxy using a sub-/domains to connect clients to a s
 - [X] Status Response Caching
 - [X] Proxy Protocol Support
 - [X] Ratelimiter
-- [ ] Autoreloding config
 - [ ] banlist
   - [ ] Global
     - [ ] ip banlist
@@ -42,7 +41,7 @@ Infrared works as a reverse proxy using a sub-/domains to connect clients to a s
     - [ ] username banlist
 - [ ] AntiVpn
 - [ ] Database
-   - [ ] replace cobfig with database
+   - [ ] replace config with database
    - [ ] make the database redundant
 
 ## Useful Links
